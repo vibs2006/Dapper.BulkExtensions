@@ -4,15 +4,21 @@ using System.Data;
 using System.Reflection;
 using System.Text;
 
-public static class BulkInsertExtensions
+public static class BulkInsertPostgresExtensions
 {
-    public static Task<string> GenerateBulkInsertSql<T>(List<T> collection, string tableName)
+    public static Task<string> GenerateBulkInsertSql<T>(
+        List<T> collection,
+        string tableNameWithSchemaPrefix
+    )
     {
-        if (string.IsNullOrWhiteSpace(tableName))
-            throw new ArgumentNullException(nameof(tableName));
+        if (string.IsNullOrWhiteSpace(tableNameWithSchemaPrefix))
+            throw new ArgumentNullException(
+                nameof(tableNameWithSchemaPrefix),
+                "Table name is required"
+            );
 
-        if (collection == null || collection.Count() == 0)
-            return Task.FromResult(string.Empty);
+        if (collection is null || collection.Count() == 0)
+            throw new ArgumentException($"No columns found in table {tableNameWithSchemaPrefix}");
 
         Type classType = typeof(T);
         PropertyInfo[] propertyInfo = classType.GetProperties();
@@ -22,10 +28,10 @@ public static class BulkInsertExtensions
             .Where(x => propertyShouldBeEditable(x) == true)
             .Select(x => $"\"{x.Name}\"");
 
-        var col =
-            $"insert into {tableName} ({string.Join(',', inserColumnsCollection)}) {Environment.NewLine}values{Environment.NewLine}";
+        var insertColumns =
+            $"insert into {tableNameWithSchemaPrefix} ({string.Join(',', inserColumnsCollection)}) {Environment.NewLine}values{Environment.NewLine}";
 
-        StringBuilder sbMain = new StringBuilder(col);
+        StringBuilder sbMain = new(insertColumns);
 
         foreach (T item in collection)
         {
